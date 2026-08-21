@@ -4,8 +4,7 @@ How long does a bitcoin stack last if you spend it down? Enter what you hold,
 what you spend, and what you think bitcoin does — get the runway, the date it
 hits zero, and the rate you could sustain forever.
 
-**Live:** [<https://satoshipuzzles.github.io/bitcoin-retirement-calculator/>
-](https://bevstr.github.io/bitcoin-retirement-calculator/)
+**Live:** <https://bevstr.github.io/bitcoin-retirement-calculator/>
 ## What it models
 
 Monthly steps. In each month you sell enough bitcoin at that month's price to
