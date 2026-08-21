@@ -63,6 +63,24 @@ function inTerminalRegime(price, g, basis) {
 }
 
 /**
+ * Long-run net proceeds per BTC are `alpha * price + beta` after the price
+ * path can no longer recross the cost basis.
+ *
+ * Above basis: net = (1 − fee − tax) * price + basis * tax
+ * At/below basis: tax is zero, so net = (1 − fee) * price
+ *
+ * Rising price (g > 0) ends above basis. Falling price ends at/below it.
+ * A flat price stays on whichever side it started.
+ */
+function longRunNetCoeffs(g, startPrice, costBasis, taxRate, feeRate) {
+  const tax = asRate(taxRate);
+  const fee = asRate(feeRate);
+  const above = g > 0 || (g === 0 && startPrice > costBasis);
+  if (above) return {alpha: 1 - fee - tax, beta: costBasis * tax};
+  return {alpha: 1 - fee, beta: 0};
+}
+
+/**
  * BTC that must be sold to raise `need` net fiat at this month's price.
  * Infinity when a sale would not yield positive net proceeds.
  */
@@ -85,8 +103,16 @@ function btcToRaise(need, price, costBasis, taxRate, feeRate) {
  * term ratio and the asymptotic ratio r = (1+inf)/(1+g); they agree to a
  * tight tolerance before we stop, so the result is not a truncated horizon.
  *
- * Returns Infinity when the series diverges (CAGR ≤ inflation, or net
- * proceeds eventually hit zero).
+ * CAGR > inflation is necessary for the usual (price-scaling) case, but not
+ * sufficient. In the long-run sale regime net = alpha * price + beta with
+ *   alpha = 1 − feeRate − taxRate   (once price is above basis).
+ * If alpha <= 0, net proceeds do not grow with the BTC price. A constant or
+ * shrinking net cannot fund non-decreasing spending forever, so this returns
+ * Infinity without inspecting floating-point term ratios. The one exception
+ * is a positive constant net (alpha = 0, beta > 0) while spending itself
+ * shrinks (inf < 0).
+ *
+ * Returns Infinity when the series diverges.
  */
 function infiniteBtcNeeded(monthlySpend0, price0, g, inf, costBasis, taxRate, feeRate) {
   if (monthlySpend0 <= 0) return 0;
@@ -97,6 +123,15 @@ function infiniteBtcNeeded(monthlySpend0, price0, g, inf, costBasis, taxRate, fe
   // not outrun inflation the terms do not decay (for proceeds that scale
   // with price) and no finite stack lasts forever.
   if (!(r < 1)) return Infinity;
+
+  const {alpha, beta} = longRunNetCoeffs(g, price0, costBasis, taxRate, feeRate);
+  // Do not let a spurious local ratio decide this: if net does not scale
+  // positively with price, the (1+inf)/(1+g) geometric tail is the wrong model.
+  if (!(alpha > 0)) {
+    const constantNet = alpha === 0 && beta > 0;
+    const spendShrinks = inf < 0;
+    if (!(constantNet && spendShrinks)) return Infinity;
+  }
 
   const REL = 1e-14;
   const MAX = 200000;
@@ -114,10 +149,26 @@ function infiniteBtcNeeded(monthlySpend0, price0, g, inf, costBasis, taxRate, fe
     const nextSell = btcToRaise(nextSpend, nextP, costBasis, taxRate, feeRate);
     if (!isFinite(nextSell)) return Infinity;
 
+    // Constant long-run net (alpha = 0, beta > 0) with shrinking spend is a
+    // geometric series of ratio 1+inf — not r. Apply that tail once the
+    // path is in the terminal regime so we never use the price-scaling model.
+    if (
+      !(alpha > 0) &&
+      inf < 0 &&
+      sell > 0 &&
+      inTerminalRegime(p, g, costBasis) &&
+      inTerminalRegime(nextP, g, costBasis)
+    ) {
+      const q = 1 + inf;
+      if (q < 1) return total + nextSell / (1 - q);
+    }
+
     // Remaining path is in one sale regime, so consecutive terms approach a
     // geometric series. Bound the tail between the local ratio and r; keep
     // summing exact months until that interval is negligible.
+    // Only valid while long-run net scales with price (alpha > 0).
     if (
+      alpha > 0 &&
       sell > 0 &&
       inTerminalRegime(p, g, costBasis) &&
       inTerminalRegime(nextP, g, costBasis)
@@ -235,7 +286,11 @@ export function project({
   }
 
   const unitBtc = infiniteBtcNeeded(1, startPrice, g, inf, basis, taxRate, feeRate);
-  const requiredBtc = !isFinite(unitBtc) ? Infinity : netMonthly * unitBtc;
+  // Zero spending never depletes the stack, even when no *positive* rate is
+  // sustainable (CAGR ≤ inflation, or tax/fees destroy convergence).
+  const requiredBtc = netMonthly <= 0
+    ? 0
+    : !isFinite(unitBtc) ? Infinity : netMonthly * unitBtc;
   const sustainableMonthly = !isFinite(unitBtc) || unitBtc === 0 ? 0 : startBtc / unitBtc;
 
   const last = series[series.length - 1];
@@ -262,21 +317,33 @@ export function project({
   };
 }
 
-/** 27.4 -> "27 years 5 months" */
+const DAYS_PER_MONTH = 365.25 / 12;
+
+function daysFromFracMonth(frac) {
+  return Math.round(frac * DAYS_PER_MONTH);
+}
+
+/** 27.4 -> "27 years 4 months 12 days"; 2.5 -> "2 months 15 days" */
 export function formatDuration(months) {
   if (months === null || !isFinite(months)) return '—';
-  const whole = Math.floor(months);
-  const y = Math.floor(whole / 12);
-  const m = whole % 12;
+  const y = Math.floor(months / 12);
+  const rem = months - y * 12;
+  const m = Math.floor(rem);
+  const days = daysFromFracMonth(rem - m);
   const parts = [];
   if (y) parts.push(`${y} year${y === 1 ? '' : 's'}`);
-  if (m || !y) parts.push(`${m} month${m === 1 ? '' : 's'}`);
+  if (m) parts.push(`${m} month${m === 1 ? '' : 's'}`);
+  if (days) parts.push(`${days} day${days === 1 ? '' : 's'}`);
+  if (!parts.length) parts.push('0 months');
   return parts.join(' ');
 }
 
 /** Calendar date `months` from `from`, without mutating `from`. */
 export function addMonths(from, months) {
   const d = new Date(from.getTime());
-  d.setMonth(d.getMonth() + Math.floor(months));
+  const whole = Math.floor(months);
+  const frac = months - whole;
+  d.setMonth(d.getMonth() + whole);
+  if (frac) d.setDate(d.getDate() + daysFromFracMonth(frac));
   return d;
 }

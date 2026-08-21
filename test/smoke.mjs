@@ -73,6 +73,21 @@ for (const [id, name] of [['chart-btc', 'btc chart'], ['chart-value', 'value cha
 const rows = $('table').tBodies[0].rows.length;
 assert('table populated', rows > 1, `rows=${rows}`);
 
+// A depleting run must include the final 0-BTC row even when it is not a year tick.
+$('spend').value = '400000';
+$('horizon').value = '10';
+$('spend').dispatchEvent(new window.Event('input', {bubbles: true}));
+const tableRows = [...$('table').tBodies[0].rows];
+const depletionRow = tableRows.find(row => row.cells[1]?.textContent === '0 BTC');
+assert('depletion row appears in the table', !!depletionRow,
+  tableRows.map(row => `${row.cells[0].textContent}:${row.cells[1].textContent}`).join(' | '));
+assert('depletion row shows a fractional year',
+  !!(depletionRow && /\.\d/.test(depletionRow.cells[0].textContent)),
+  depletionRow?.cells[0].textContent);
+
+// Restore a low spend so the remaining checks still see a recompute.
+$('horizon').value = '40';
+
 // Editing an input must recompute.
 const before = $('hero-figure').textContent;
 $('spend').value = '400';
@@ -108,6 +123,15 @@ assert('fees tip mentions sale',
 assert('spent tip is nominal',
   (document.querySelector('#t-spent')?.closest('.tile')?.querySelector('.info')?.dataset.tip || '')
     .toLowerCase().includes('nominal'));
+assert('spent label is nominal',
+  (document.querySelector('#t-spent')?.closest('.tile')?.querySelector('.tile-label')?.textContent || '')
+    .toLowerCase().includes('nominal'));
+assert('currency tip mentions cost basis',
+  (document.querySelector('#currency')?.closest('label')?.querySelector('.info')?.dataset.tip || '')
+    .toLowerCase().includes('cost basis'));
+assert('spend-forever tip does not treat CAGR as sufficient',
+  (document.querySelector('#t-sustainable')?.closest('.tile')?.querySelector('.info')?.dataset.tip || '')
+    .toLowerCase().includes('tax'));
 assert('inflation tip explains purchasing power',
   (document.querySelector('#inflation')?.closest('label')?.querySelector('.info')?.dataset.tip || '')
     .toLowerCase().includes('buying power'));

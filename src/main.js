@@ -149,9 +149,8 @@ function renderHero(r, input) {
     $('hero-label').textContent = 'Your stack lasts';
     $('hero-figure').textContent = 'Indefinitely';
     note.innerHTML =
-      `At ${input.cagr}% a year the price outruns ${input.inflation}% inflation, so the stack ` +
-      `regrows faster than you spend it. You would still hold <strong>${btcAmount(r.endBtc)}</strong> ` +
-      `after ${input.horizon} years.`;
+      `Holdings still fall as you sell, but over time the BTC needed to fund withdrawals falls enough that the stack never reaches zero. Fiat value may still rise if the price keeps growing. ` +
+      `You would still hold <strong>${btcAmount(r.endBtc)}</strong> after ${input.horizon} years.`;
     return;
   }
 
@@ -182,8 +181,9 @@ function renderTiles(r, input) {
     $('t-sustainable-note').textContent = `${perLabel}, forever, from ${btcAmount(input.btc)}`;
   } else {
     $('t-sustainable').textContent = 'Nothing';
-    $('t-sustainable-note').textContent =
-      'Inflation matches or beats the projected CAGR, so no rate is sustainable.';
+    $('t-sustainable-note').textContent = input.cagr <= input.inflation
+      ? 'Inflation matches or beats the projected CAGR, so no rate is sustainable.'
+      : 'Tax and fees leave too little from each sale for any spending rate to last forever.';
   }
 
   if (isFinite(r.requiredBtc)) {
@@ -194,7 +194,9 @@ function renderTiles(r, input) {
         : `${btcAmount(r.requiredBtc - input.btc)} more than you hold.`;
   } else {
     $('t-required').textContent = '∞';
-    $('t-required-note').textContent = 'No finite stack survives inflation at this CAGR.';
+    $('t-required-note').textContent = input.cagr <= input.inflation
+      ? 'No finite stack survives inflation at this CAGR.'
+      : 'Tax and fees keep the drawdown from converging — no finite stack lasts forever.';
   }
 
   $('t-spent').textContent = moneyCompact(r.spentFiat);
@@ -256,11 +258,16 @@ function renderCharts(r, input) {
 function renderTable(r) {
   const body = $('table').tBodies[0];
   body.innerHTML = '';
+  const last = r.series[r.series.length - 1];
+  const showDepletion = r.depletionMonth !== null && last.btc === 0;
   for (const p of r.series) {
-    if (p.month % 12 !== 0) continue;
+    const yearTick = p.month % 12 === 0;
+    const depletionRow = showDepletion && p === last && !yearTick;
+    if (!yearTick && !depletionRow) continue;
+    const years = p.month / 12;
     const tr = document.createElement('tr');
     for (const cell of [
-      String(p.month / 12),
+      yearTick ? String(years) : years.toFixed(2),
       btcAmount(p.btc),
       money(p.price),
       money(p.value),

@@ -34,7 +34,7 @@
         <label><span class="label-text">Bitcoin held <button type="button" class="info" aria-label="About bitcoin held" data-tip="How much BTC you currently own.">i</button></span>
           <input id="btc" type="number" min="0" step="any" value="1" inputmode="decimal" />
         </label>
-        <label><span class="label-text">Currency <button type="button" class="info" aria-label="About currency" data-tip="Fiat currency for price, spend, and value figures.">i</button></span>
+        <label><span class="label-text">Currency <button type="button" class="info" aria-label="About currency" data-tip="Fiat currency for price, spend, cost basis, and value figures.">i</button></span>
           <select id="currency">
             <option value="USD" selected>USD $</option>
             <option value="EUR">EUR €</option>
@@ -101,7 +101,7 @@
   <!-- ── secondary numbers ─────────────────────────────────────────────── -->
   <section class="tiles">
     <div class="tile">
-      <span class="tile-label">Spend forever, at most <button type="button" class="info" aria-label="About spend forever" data-tip="Highest perpetual withdrawal rate this stack can fund if CAGR keeps beating inflation.">i</button></span>
+      <span class="tile-label">Spend forever, at most <button type="button" class="info" aria-label="About spend forever" data-tip="Highest withdrawal this stack can fund forever when the drawdown converges. CAGR must outrun inflation, and tax and fees must still leave net proceeds that grow with the BTC price.">i</button></span>
       <strong class="tile-value" id="t-sustainable">—</strong>
       <span class="tile-note" id="t-sustainable-note"></span>
     </div>
@@ -111,7 +111,7 @@
       <span class="tile-note" id="t-required-note"></span>
     </div>
     <div class="tile">
-      <span class="tile-label">Total spent over the run <button type="button" class="info" aria-label="About total spent" data-tip="Total nominal withdrawals over the projection, including inflation.">i</button></span>
+      <span class="tile-label">Total nominal spent over the run <button type="button" class="info" aria-label="About total spent" data-tip="Total nominal withdrawals over the projection, including inflation.">i</button></span>
       <strong class="tile-value" id="t-spent">—</strong>
       <span class="tile-note" id="t-spent-note"></span>
     </div>

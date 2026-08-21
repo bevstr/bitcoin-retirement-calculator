@@ -6,6 +6,7 @@ import {
   toMonthlySpend,
   fromMonthlySpend,
   formatDuration,
+  addMonths,
   PERIODS_PER_YEAR,
   netProceedsPerBtc,
   salePerBtc,
@@ -489,9 +490,30 @@ test('zero spend never depletes', () => {
     horizonYears: 30,
   });
   assert.equal(r.survivesHorizon, true);
+  assert.equal(r.perpetual, true);
   near(r.endBtc, 1);
   near(r.endValue, 100000 * Math.pow(1.1, 30), 1);
   near(r.requiredBtc, 0, 1e-12);
+});
+
+test('zero spend is perpetual even when CAGR is below inflation', () => {
+  const r = project({
+    btc: 1,
+    price: 100000,
+    spendAmount: 0,
+    spendPeriod: 'month',
+    cagr: 2,
+    inflation: 5,
+    taxRate: 25,
+    costBasis: 30000,
+    feeRate: 1,
+    horizonYears: 30,
+  });
+  assert.equal(r.requiredBtc, 0);
+  assert.equal(r.perpetual, true);
+  assert.equal(r.survivesHorizon, true);
+  near(r.endBtc, 1);
+  assert.equal(r.sustainableMonthly, 0);
 });
 
 test('series is monotonically non-increasing in btc and starts at the stack', () => {
@@ -518,7 +540,107 @@ test('formatDuration reads like a human wrote it', () => {
   assert.equal(formatDuration(0), '0 months');
   assert.equal(formatDuration(1), '1 month');
   assert.equal(formatDuration(12), '1 year');
-  assert.equal(formatDuration(13.9), '1 year 1 month');
+  assert.equal(formatDuration(13.9), '1 year 1 month 27 days');
   assert.equal(formatDuration(329), '27 years 5 months');
   assert.equal(formatDuration(null), '—');
+});
+
+test('formatDuration does not drop a fractional final month', () => {
+  assert.equal(formatDuration(2.5), '2 months 15 days');
+  assert.notEqual(formatDuration(2.5), '2 months');
+  const r = project({
+    btc: 1,
+    price: 10000,
+    spendAmount: 4000,
+    spendPeriod: 'month',
+    cagr: 0,
+    inflation: 0,
+  });
+  near(r.depletionMonth, 2.5, 1e-9);
+  assert.equal(formatDuration(r.depletionMonth), '2 months 15 days');
+});
+
+test('addMonths includes the fractional month as days', () => {
+  const from = new Date(2020, 0, 15);
+  const got = addMonths(from, 2.5);
+  const want = new Date(2020, 0, 15);
+  want.setMonth(want.getMonth() + 2);
+  want.setDate(want.getDate() + Math.round(0.5 * (365.25 / 12)));
+  assert.equal(got.getTime(), want.getTime());
+  assert.ok(got.getTime() > addMonths(from, 2).getTime());
+});
+
+test('100% tax with a positive basis does not report a finite perpetual stack', () => {
+  const r = project({
+    btc: 10,
+    price: 100000,
+    spendAmount: 1000,
+    spendPeriod: 'month',
+    cagr: 20,
+    inflation: 3,
+    costBasis: 40000,
+    taxRate: 100,
+    feeRate: 0,
+    horizonYears: 50,
+  });
+  assert.equal(r.requiredBtc, Infinity);
+  assert.equal(r.perpetual, false);
+  assert.equal(r.sustainableMonthly, 0);
+});
+
+test('a very high but sub-100% combined tax and fee rate can still converge', () => {
+  // alpha = 1 - 0.01 - 0.90 = 0.09 > 0, so net still grows with price.
+  const r = project({
+    btc: 50,
+    price: 100000,
+    spendAmount: 1000,
+    spendPeriod: 'month',
+    cagr: 20,
+    inflation: 3,
+    costBasis: 40000,
+    taxRate: 90,
+    feeRate: 1,
+    horizonYears: 50,
+  });
+  assert.ok(isFinite(r.requiredBtc), `requiredBtc=${r.requiredBtc}`);
+  assert.ok(r.requiredBtc > 0);
+  assert.ok(r.sustainableMonthly > 0);
+  const at = project({
+    btc: r.requiredBtc,
+    price: 100000,
+    spendAmount: 1000,
+    spendPeriod: 'month',
+    cagr: 20,
+    inflation: 3,
+    costBasis: 40000,
+    taxRate: 90,
+    feeRate: 1,
+    horizonYears: 100,
+  });
+  assert.equal(at.perpetual, true);
+  assert.equal(at.survivesHorizon, true);
+});
+
+test('audited 6.25 BTC scenario matches independent reference values', () => {
+  const r = project({
+    btc: 6.25,
+    price: 107789,
+    spendAmount: 8000,
+    spendPeriod: 'month',
+    cagr: 25,
+    inflation: 3,
+    taxRate: 25,
+    costBasis: 30000,
+    feeRate: 0.5,
+    horizonYears: 30,
+  });
+  // Independently summed; not taken from project().
+  relNear(r.requiredBtc, 5.96844623648538, 1e-12);
+  relNear(r.sustainableMonthly, 8377.3896955539, 1e-12);
+  relNear(r.endBtc, 0.300258884031486, 1e-12);
+  relNear(r.endPrice, 87071260.7875792, 1e-12);
+  relNear(r.endValue, 26143919.595293, 1e-12);
+  relNear(r.spentFiat, 4629704.29988788, 1e-12);
+  relNear(r.soldBtc, 5.94974111596852, 1e-12);
+  assert.equal(r.perpetual, true);
 });

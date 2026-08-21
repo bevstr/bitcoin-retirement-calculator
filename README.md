@@ -35,8 +35,12 @@ proceeds per BTC are price minus selling fees minus tax on
 `max(price − cost basis, 0)`. That is no longer a pure geometric series, so
 the BTC needed to fund spending forever is summed from the same monthly sale
 math as the projection, with a geometric tail once the price path can no
-longer cross the cost basis. It still converges only when growth outruns
-inflation. `test/model.test.mjs` cross-checks the threshold against the
+longer cross the cost basis. CAGR greater than inflation is necessary for the
+usual case — where net sale proceeds still grow with the BTC price — but not
+sufficient: tax and fees must leave a positive long-run share of each sale
+(`1 − fee rate − tax rate > 0` once price is above the cost basis). Otherwise
+the infinite drawdown diverges even when price growth outruns inflation.
+`test/model.test.mjs` cross-checks the threshold against the
 step-by-step simulation: funding the stack at exactly the computed threshold
 must survive a 100-year run, and 2% less must not.
 
