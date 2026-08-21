@@ -187,10 +187,24 @@ label {
   color: var(--text-primary);
   border-color: var(--text-secondary);
 }
-.info.is-open::after {
-  opacity: 1;
-  visibility: visible;
+
+/* Rendered as a real element on <body> so it can never be clipped by a card,
+   and so screen readers announce it via aria-describedby. */
+.tip {
+  position: fixed;
+  z-index: 40;
+  max-width: min(260px, calc(100vw - 24px));
+  padding: 8px 10px;
+  border: 1px solid var(--axis);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font: 400 12px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  text-align: left;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  pointer-events: none;
 }
+.tip[hidden] { display: none; }
 
 input, select {
   width: 100%;

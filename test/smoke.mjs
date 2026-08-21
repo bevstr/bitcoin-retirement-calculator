@@ -109,6 +109,18 @@ const described = tips.every(b => {
 assert('tips are exposed to assistive tech', described);
 assert('tips render outside the cards', document.querySelectorAll('body > .tip').length === tips.length);
 
+// jsdom applies no CSS, so structural assertions alone once let an entirely
+// unstyled tooltip ship. Check the built stylesheet actually styles every
+// class the scripts create at runtime.
+const css = readFileSync('dist/styles.css', 'utf8');
+for (const cls of ['tip', 'chart-tip', 'chart-grid', 'chart-axis', 'chart-tick',
+                   'chart-cross', 'chart-dot', 'chart-marker', 'chart-marker-label']) {
+  assert(`.${cls} is styled in the shipped css`,
+    new RegExp(`\\.${cls}\\b[^{]*\\{`).test(css));
+}
+assert('.tip is positioned', /\.tip\s*\{[^}]*position:\s*fixed/.test(css));
+assert('no dead ::after tooltip rules', !/\.info[^{]*::after/.test(css));
+
 let failed = 0;
 for (const [name, ok, detail] of checks) {
   console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${ok || !detail ? '' : `  — ${detail}`}`);
