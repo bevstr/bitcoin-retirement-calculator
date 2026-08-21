@@ -98,6 +98,17 @@ const inflationTip = document.querySelector('#inflation')?.closest('label')?.que
 inflationTip?.dispatchEvent(new window.Event('click', {bubbles: true}));
 assert('tip toggles open on click', inflationTip?.classList.contains('is-open'));
 
+// Each tip must be announceable, not only visible: a real element on <body>
+// carrying the text, wired to the button with aria-describedby.
+const described = tips.every(b => {
+  const id = b.getAttribute('aria-describedby');
+  const tip = id && document.getElementById(id);
+  return tip && tip.parentElement === document.body &&
+    tip.textContent === b.dataset.tip && tip.getAttribute('role') === 'tooltip';
+});
+assert('tips are exposed to assistive tech', described);
+assert('tips render outside the cards', document.querySelectorAll('body > .tip').length === tips.length);
+
 let failed = 0;
 for (const [name, ok, detail] of checks) {
   console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${ok || !detail ? '' : `  — ${detail}`}`);

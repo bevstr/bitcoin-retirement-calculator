@@ -306,26 +306,99 @@ async function fetchFromCoinbase(code) {
   return Number(data?.data?.amount);
 }
 
-// ── info tooltips (hover + tap) ───────────────────────────────────────────
+// ── info tooltips (hover, focus, tap) ────────────────────────────────────
+// The bubble lives on <body> rather than in a ::after, for two reasons: a
+// pseudo-element cannot be measured, so it cannot be clamped inside the
+// viewport (the leftmost tile's tip was being cut off), and CSS-generated
+// content is not reliably announced by screen readers.
+const MARGIN = 8;
+
 function initInfoTips() {
-  const tips = [...document.querySelectorAll('.info')];
-  const closeAll = except => {
-    for (const tip of tips) {
-      if (tip !== except) tip.classList.remove('is-open');
+  const buttons = [...document.querySelectorAll('.info[data-tip]')];
+  let open = null;
+
+  const hide = except => {
+    for (const b of buttons) {
+      if (b === except) continue;
+      b.classList.remove('is-open');
+      b.tip.hidden = true;
     }
+    if (open && open !== except) open = null;
   };
-  for (const tip of tips) {
-    tip.addEventListener('click', e => {
+
+  const place = button => {
+    const tip = button.tip;
+    tip.hidden = false;
+    const anchor = button.getBoundingClientRect();
+    const box = tip.getBoundingClientRect();
+
+    let left = anchor.left + anchor.width / 2 - box.width / 2;
+    left = Math.min(Math.max(left, MARGIN), window.innerWidth - box.width - MARGIN);
+
+    // Above the icon by default; below it when there is no room above.
+    const above = anchor.top - box.height - MARGIN;
+    const top = above >= MARGIN ? above : anchor.bottom + MARGIN;
+
+    tip.style.left = `${Math.round(left)}px`;
+    tip.style.top = `${Math.round(top)}px`;
+  };
+
+  buttons.forEach((button, i) => {
+    const tip = document.createElement('span');
+    tip.className = 'tip';
+    tip.role = 'tooltip';
+    tip.id = `tip-${i}`;
+    tip.textContent = button.dataset.tip;
+    tip.hidden = true;
+    document.body.append(tip);
+    button.tip = tip;
+    // Present to assistive tech whether or not the bubble is visible.
+    button.setAttribute('aria-describedby', tip.id);
+
+    const show = () => {
+      hide(button);
+      place(button);
+    };
+    const dismiss = () => {
+      if (open === button) return; // pinned by a tap
+      button.classList.remove('is-open');
+      tip.hidden = true;
+    };
+
+    button.addEventListener('pointerenter', show);
+    button.addEventListener('pointerleave', dismiss);
+    button.addEventListener('focus', show);
+    button.addEventListener('blur', () => {
+      open = null;
+      button.classList.remove('is-open');
+      tip.hidden = true;
+    });
+    button.addEventListener('click', e => {
+      // Inside a <label>, a bare click would forward to the field.
       e.preventDefault();
       e.stopPropagation();
-      const open = tip.classList.toggle('is-open');
-      if (open) closeAll(tip);
+      if (button.classList.toggle('is-open')) {
+        open = button;
+        show();
+      } else {
+        open = null;
+        tip.hidden = true;
+      }
     });
-  }
-  document.addEventListener('click', () => closeAll());
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeAll();
   });
+
+  document.addEventListener('click', () => {
+    open = null;
+    hide();
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    open = null;
+    hide();
+  });
+  window.addEventListener('scroll', () => {
+    if (open) place(open);
+  }, {passive: true});
 }
 
 // ── theme ─────────────────────────────────────────────────────────────────
