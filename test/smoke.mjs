@@ -11,7 +11,7 @@ virtualConsole.on('error', (...a) => errors.push(a.join(' ')));
 
 const dom = new JSDOM(readFileSync('dist/index.html', 'utf8'), {
   runScripts: 'outside-only',
-  url: 'https://example.com/?btc=2&price=80000&spend=4000&period=month&cagr=25&inflation=3&tax=0&horizon=40&currency=USD',
+  url: 'https://example.com/?btc=2&price=80000&spend=4000&period=month&cagr=25&inflation=3&tax=15&basis=20000&fees=1&horizon=40&currency=USD',
   pretendToBeVisual: true,
   virtualConsole,
 });
@@ -36,12 +36,15 @@ assert('no uncaught errors', errors.length === 0, errors.join(' | '));
 assert('btc from url', $('btc').value === '2', $('btc').value);
 assert('price from url', $('price').value === '80000', $('price').value);
 assert('cagr from url', $('cagr').value === '25', $('cagr').value);
+assert('tax from url', $('tax').value === '15', $('tax').value);
+assert('basis from url', $('basis').value === '20000', $('basis').value);
+assert('fees from url', $('fees').value === '1', $('fees').value);
 assert('horizon from url', $('horizon').value === '40', $('horizon').value);
 
 // The headline must match the model run exactly.
 const expected = project({
   btc: 2, price: 80000, spendAmount: 4000, spendPeriod: 'month',
-  cagr: 25, inflation: 3, taxRate: 0, horizonYears: 40,
+  cagr: 25, inflation: 3, taxRate: 15, costBasis: 20000, feeRate: 1, horizonYears: 40,
 });
 const wantHero = expected.perpetual
   ? 'Indefinitely'
@@ -91,6 +94,20 @@ assert('still no uncaught errors', errors.length === 0, errors.join(' | '));
 // Info tooltips on the fields Bevstr asked for.
 const tips = [...document.querySelectorAll('button.info[data-tip]')];
 assert('info tips present', tips.length >= 8, `count=${tips.length}`);
+assert('basis field exists', !!$('basis'));
+assert('fees field exists', !!$('fees'));
+assert('basis tip mentions lots',
+  (document.querySelector('#basis')?.closest('label')?.querySelector('.info')?.dataset.tip || '')
+    .includes('acquisition lots'));
+assert('tax tip mentions gains',
+  (document.querySelector('#tax')?.closest('label')?.querySelector('.info')?.dataset.tip || '')
+    .toLowerCase().includes('gains'));
+assert('fees tip mentions sale',
+  (document.querySelector('#fees')?.closest('label')?.querySelector('.info')?.dataset.tip || '')
+    .toLowerCase().includes('sale'));
+assert('spent tip is nominal',
+  (document.querySelector('#t-spent')?.closest('.tile')?.querySelector('.info')?.dataset.tip || '')
+    .toLowerCase().includes('nominal'));
 assert('inflation tip explains purchasing power',
   (document.querySelector('#inflation')?.closest('label')?.querySelector('.info')?.dataset.tip || '')
     .toLowerCase().includes('buying power'));

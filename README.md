@@ -19,27 +19,26 @@ withdrawal keeps its **purchasing power** rather than its nominal size.
 | Spend | Per day, week, month or year, in today's money |
 | Bitcoin CAGR | Projected annual growth — negative is allowed, and worth trying |
 | Inflation | Annual increase applied to spending |
-| Tax + fees | Percentage skimmed off every sale; withdrawals are grossed up so what you spend is what lands |
+| Estimated average BTC cost basis | Approximate average purchase price per BTC, used to estimate gains |
+| Estimated tax rate on gains | Applied only to the gain above that cost basis — not to the whole sale |
+| Selling fees | Percentage of gross sale proceeds |
 | Project for | Horizon, 1–100 years |
 
 Outputs: time to depletion (to the month, including a partial final month), the
 calendar date, the most you could spend **forever**, the stack size that would
 make the drawdown perpetual, total spent, and bitcoin sold.
 
-### The perpetual case, in closed form
+### The perpetual case
 
-Bitcoin sold in month *m* is `(spend₀ / price₀) · rᵐ` where
-`r = (1 + inflation) / (1 + growth)`. The whole infinite drawdown therefore costs
-
-```
-(spend₀ / price₀) / (1 − r)   bitcoin,   and converges only when r < 1
-```
-
-— that is, only when growth outruns inflation. That closed form gives the
-"spend forever" and "stack needed" figures directly, and
-`test/model.test.mjs` cross-checks it against the step-by-step simulation:
-funding the stack at exactly the computed threshold must survive a 100-year run,
-and 2% less must not.
+Bitcoin sold in month *m* is `spendₘ / netProceeds(priceₘ)`, where net
+proceeds per BTC are price minus selling fees minus tax on
+`max(price − cost basis, 0)`. That is no longer a pure geometric series, so
+the BTC needed to fund spending forever is summed from the same monthly sale
+math as the projection, with a geometric tail once the price path can no
+longer cross the cost basis. It still converges only when growth outruns
+inflation. `test/model.test.mjs` cross-checks the threshold against the
+step-by-step simulation: funding the stack at exactly the computed threshold
+must survive a 100-year run, and 2% less must not.
 
 ## What it does not model
 
@@ -68,7 +67,7 @@ Home / End), and a table-view twin so no value is reachable only by hover.
 
 ```bash
 npm install
-npm test          # 13 model unit tests, then a jsdom boot test of the built bundle
+npm test          # model unit tests, then a jsdom boot test of the built bundle
 npm run build     # -> dist/
 npx serve dist
 ```

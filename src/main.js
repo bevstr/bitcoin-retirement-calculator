@@ -11,6 +11,8 @@ const FIELDS = {
   cagr: 20,
   inflation: 3,
   tax: 0,
+  basis: 0,
+  fees: 0,
   horizon: 50,
   currency: 'USD',
 };
@@ -62,6 +64,8 @@ function readInputs() {
     cagr: num('cagr'),
     inflation: num('inflation'),
     tax: num('tax'),
+    basis: num('basis'),
+    fees: num('fees'),
     horizon: num('horizon'),
     currency: $('currency').value,
   };
@@ -105,10 +109,9 @@ function render() {
   const input = readInputs();
   currency = input.currency;
 
-  const missing = ['btc', 'price', 'spend', 'cagr', 'inflation', 'tax', 'horizon'].filter(
-    k => input[k] === null
-  );
-  for (const k of ['btc', 'price', 'spend', 'cagr', 'inflation', 'tax', 'horizon']) {
+  const required = ['btc', 'price', 'spend', 'cagr', 'inflation', 'tax', 'basis', 'fees', 'horizon'];
+  const missing = required.filter(k => input[k] === null);
+  for (const k of required) {
     $(k).classList.toggle('invalid', input[k] === null);
   }
   if (missing.length) {
@@ -125,6 +128,8 @@ function render() {
     cagr: input.cagr,
     inflation: input.inflation,
     taxRate: input.tax,
+    costBasis: input.basis,
+    feeRate: input.fees,
     horizonYears: input.horizon,
   });
 

@@ -7,10 +7,18 @@ import {
   fromMonthlySpend,
   formatDuration,
   PERIODS_PER_YEAR,
+  netProceedsPerBtc,
+  salePerBtc,
 } from '../src/model.js';
 
 const near = (a, b, tol = 1e-6) =>
   assert.ok(Math.abs(a - b) <= tol, `expected ${a} ≈ ${b} (tol ${tol})`);
+
+const relNear = (a, b, tol = 1e-9) =>
+  assert.ok(
+    Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b)),
+    `expected ${a} ≈ ${b} (rel ${tol})`,
+  );
 
 test('monthlyRate compounds back to the annual rate', () => {
   near(Math.pow(1 + monthlyRate(20), 12) - 1, 0.2, 1e-12);
@@ -24,6 +32,18 @@ test('period conversions round-trip', () => {
   }
   near(toMonthlySpend(1200, 'year'), 100);
   near(toMonthlySpend(100, 'month'), 100);
+});
+
+test('existing day/week/month/year spending conversions still work', () => {
+  const common = {btc: 2, price: 90000, cagr: 15, inflation: 3};
+  const monthly = project({...common, spendAmount: 1200, spendPeriod: 'month'});
+  const yearly = project({...common, spendAmount: 14400, spendPeriod: 'year'});
+  const weekly = project({...common, spendAmount: 1200 * (12 / (365.25 / 7)), spendPeriod: 'week'});
+  const daily = project({...common, spendAmount: 1200 * (12 / 365.25), spendPeriod: 'day'});
+  near(monthly.depletionMonth, yearly.depletionMonth, 1e-9);
+  near(monthly.depletionMonth, weekly.depletionMonth, 1e-9);
+  near(monthly.depletionMonth, daily.depletionMonth, 1e-9);
+  near(monthly.soldBtc, yearly.soldBtc, 1e-9);
 });
 
 test('flat price, no inflation: depletion is simple division', () => {
@@ -43,6 +63,31 @@ test('flat price, no inflation: depletion is simple division', () => {
   assert.equal(r.perpetual, false);
 });
 
+test('zero tax and zero fees match the old no-haircut projection', () => {
+  const r = project({
+    btc: 1,
+    price: 100000,
+    spendAmount: 2000,
+    spendPeriod: 'month',
+    cagr: 10,
+    inflation: 3,
+    taxRate: 0,
+    costBasis: 0,
+    feeRate: 0,
+    horizonYears: 40,
+  });
+  const g = monthlyRate(10);
+  const inf = monthlyRate(3);
+  // Month-0 sale is spend / price; later months inflate spend and grow price.
+  near(r.series[0].btc - r.series[1].btc, 2000 / 100000, 1e-12);
+  near(r.series[1].price, 100000 * (1 + g), 1e-9);
+  const need1 = 2000 * (1 + inf);
+  const np1 = netProceedsPerBtc(r.series[1].price, 0, 0, 0);
+  near(r.series[1].btc - r.series[2].btc, need1 / np1, 1e-12);
+  near(r.taxPaid, 0, 1e-12);
+  near(r.feesPaid, 0, 1e-12);
+});
+
 test('depletion can land mid-month', () => {
   // $10,000 of stack, $4,000/mo -> 2.5 months.
   const r = project({
@@ -55,6 +100,208 @@ test('depletion can land mid-month', () => {
   });
   near(r.depletionMonth, 2.5, 1e-9);
   near(r.series[r.series.length - 1].btc, 0);
+  near(r.spentFiat, 10000, 1e-6);
+});
+
+test('partial depletion still works with tax and fees', () => {
+  // np per BTC = 10000 - 100 (1% fees) - 0 tax (price == basis) = 9900.
+  // 1 BTC funds 9900 net; spending 4000/mo -> 9900/4000 = 2.475 months.
+  const r = project({
+    btc: 1,
+    price: 10000,
+    spendAmount: 4000,
+    spendPeriod: 'month',
+    cagr: 0,
+    inflation: 0,
+    costBasis: 10000,
+    taxRate: 30,
+    feeRate: 1,
+  });
+  near(r.depletionMonth, 9900 / 4000, 1e-9);
+  near(r.soldBtc, 1, 1e-12);
+  near(r.taxPaid, 0, 1e-12);
+  near(r.feesPaid, 100, 1e-9);
+});
+
+test('price above cost basis: tax applies only to the gain', () => {
+  const sale = salePerBtc(100000, 40000, 25, 0);
+  near(sale.tax, 15000, 1e-12);
+  near(sale.fees, 0, 1e-12);
+  near(sale.net, 85000, 1e-12);
+
+  // Spending exactly the net proceeds of 1 BTC sells exactly 1 BTC.
+  const r = project({
+    btc: 1,
+    price: 100000,
+    spendAmount: 85000,
+    spendPeriod: 'month',
+    cagr: 0,
+    inflation: 0,
+    costBasis: 40000,
+    taxRate: 25,
+    feeRate: 0,
+    horizonYears: 5,
+  });
+  near(r.depletionMonth, 1, 1e-9);
+  near(r.soldBtc, 1, 1e-12);
+  near(r.taxPaid, 15000, 1e-6);
+  near(r.spentFiat, 85000, 1e-6);
+});
+
+test('price equal to cost basis: zero capital-gains tax', () => {
+  const sale = salePerBtc(50000, 50000, 30, 1);
+  near(sale.tax, 0, 1e-12);
+  near(sale.fees, 500, 1e-12);
+  near(sale.net, 49500, 1e-12);
+
+  const r = project({
+    btc: 1,
+    price: 50000,
+    spendAmount: 49500,
+    spendPeriod: 'month',
+    cagr: 0,
+    inflation: 0,
+    costBasis: 50000,
+    taxRate: 30,
+    feeRate: 1,
+    horizonYears: 5,
+  });
+  near(r.depletionMonth, 1, 1e-9);
+  near(r.taxPaid, 0, 1e-12);
+  near(r.feesPaid, 500, 1e-6);
+});
+
+test('price below cost basis: zero capital-gains tax', () => {
+  const sale = salePerBtc(30000, 50000, 30, 1);
+  near(sale.tax, 0, 1e-12);
+  near(sale.fees, 300, 1e-12);
+  near(sale.net, 29700, 1e-12);
+
+  const r = project({
+    btc: 2,
+    price: 30000,
+    spendAmount: 29700,
+    spendPeriod: 'month',
+    cagr: 0,
+    inflation: 0,
+    costBasis: 50000,
+    taxRate: 30,
+    feeRate: 1,
+    horizonYears: 5,
+  });
+  near(r.depletionMonth, 2, 1e-9);
+  near(r.taxPaid, 0, 1e-12);
+  near(r.feesPaid, 600, 1e-6);
+});
+
+test('fees apply to the entire gross sale', () => {
+  const sale = salePerBtc(100000, 0, 0, 2);
+  near(sale.fees, 2000, 1e-12);
+  near(sale.tax, 0, 1e-12);
+  near(sale.net, 98000, 1e-12);
+
+  const r = project({
+    btc: 1,
+    price: 100000,
+    spendAmount: 98000,
+    spendPeriod: 'month',
+    cagr: 0,
+    inflation: 0,
+    feeRate: 2,
+    horizonYears: 5,
+  });
+  near(r.depletionMonth, 1, 1e-9);
+  near(r.soldBtc, 1, 1e-12);
+  near(r.feesPaid, 2000, 1e-6);
+  near(r.taxPaid, 0, 1e-12);
+});
+
+test('tax and fees together calculate the BTC sale required correctly', () => {
+  // price 100000, basis 40000, tax 20%, fees 2%
+  // fees = 2000, gain = 60000, tax = 12000, net = 86000
+  const sale = salePerBtc(100000, 40000, 20, 2);
+  near(sale.fees, 2000, 1e-12);
+  near(sale.tax, 12000, 1e-12);
+  near(sale.net, 86000, 1e-12);
+
+  const r = project({
+    btc: 1,
+    price: 100000,
+    spendAmount: 43000,
+    spendPeriod: 'month',
+    cagr: 0,
+    inflation: 0,
+    costBasis: 40000,
+    taxRate: 20,
+    feeRate: 2,
+    horizonYears: 5,
+  });
+  near(r.series[0].btc - r.series[1].btc, 0.5, 1e-12);
+  near(r.depletionMonth, 2, 1e-9);
+  near(r.soldBtc, 1, 1e-12);
+  near(r.taxPaid, 12000, 1e-6);
+  near(r.feesPaid, 2000, 1e-6);
+  near(r.spentFiat, 86000, 1e-6);
+});
+
+test('with a zero cost basis, tax on gains matches the old whole-sale haircut', () => {
+  const g = monthlyRate(10);
+  const inf = monthlyRate(3);
+  const rOld = (1 + inf) / (1 + g);
+  const netMonthly = 2000;
+  const grossUp = 1 / 0.7;
+  const expectedRequired = (netMonthly * grossUp) / (100000 * (1 - rOld));
+
+  const r = project({
+    btc: 1,
+    price: 100000,
+    spendAmount: 2000,
+    spendPeriod: 'month',
+    cagr: 10,
+    inflation: 3,
+    costBasis: 0,
+    taxRate: 30,
+    feeRate: 0,
+  });
+  relNear(r.requiredBtc, expectedRequired, 1e-12);
+  near(r.netMonthly, 2000);
+  assert.ok(r.taxPaid > 0);
+});
+
+test('inflation still compounds correctly', () => {
+  const r = project({
+    btc: 50,
+    price: 100000,
+    spendAmount: 1000,
+    spendPeriod: 'month',
+    cagr: 0,
+    inflation: 12,
+    horizonYears: 3,
+  });
+  const inf = monthlyRate(12);
+  for (let m = 0; m < 24; m++) {
+    const sold = r.series[m].btc - r.series[m + 1].btc;
+    const need = 1000 * Math.pow(1 + inf, m);
+    near(sold * r.series[m].price, need, 1e-6);
+  }
+});
+
+test('CAGR monthly conversion remains correct along the series', () => {
+  const r = project({
+    btc: 10,
+    price: 80000,
+    spendAmount: 100,
+    spendPeriod: 'month',
+    cagr: 20,
+    inflation: 0,
+    horizonYears: 5,
+  });
+  const g = monthlyRate(20);
+  near(Math.pow(1 + g, 12) - 1, 0.2, 1e-12);
+  for (let m = 0; m < r.series.length; m++) {
+    if (r.series[m].month !== m) continue;
+    near(r.series[m].price, 80000 * Math.pow(1 + g, m), 1e-6);
+  }
 });
 
 test('a stack exactly at the perpetual threshold never depletes', () => {
@@ -69,18 +316,72 @@ test('a stack exactly at the perpetual threshold never depletes', () => {
   };
   const probe = project(base);
 
-  // Fund it with exactly the required stack: it must survive the horizon.
   const atThreshold = project({...base, btc: probe.requiredBtc});
   assert.equal(atThreshold.survivesHorizon, true);
   assert.equal(atThreshold.perpetual, true);
 
-  // A hair under, and it must not.
   const under = project({...base, btc: probe.requiredBtc * 0.98});
   assert.equal(under.survivesHorizon, false);
   assert.equal(under.perpetual, false);
 });
 
-test('closed-form sustainable spend agrees with the simulation', () => {
+test('perpetual threshold stays consistent with tax, basis and fees', () => {
+  const base = {
+    btc: 1,
+    price: 100000,
+    spendAmount: 1500,
+    spendPeriod: 'month',
+    cagr: 18,
+    inflation: 3,
+    costBasis: 25000,
+    taxRate: 20,
+    feeRate: 1,
+    horizonYears: 100,
+  };
+  const probe = project(base);
+  assert.ok(isFinite(probe.requiredBtc));
+
+  const above = project({...base, btc: probe.requiredBtc * (1 + 1e-9)});
+  assert.equal(above.perpetual, true);
+  assert.equal(above.survivesHorizon, true);
+
+  const below = project({...base, btc: probe.requiredBtc * (1 - 1e-9)});
+  assert.equal(below.perpetual, false);
+
+  const clearlyUnder = project({...base, btc: probe.requiredBtc * 0.98});
+  assert.equal(clearlyUnder.survivesHorizon, false);
+  assert.equal(clearlyUnder.perpetual, false);
+});
+
+test('sustainableMonthly and requiredBtc agree with each other', () => {
+  const base = {
+    btc: 3,
+    price: 80000,
+    spendAmount: 2500,
+    spendPeriod: 'month',
+    cagr: 25,
+    inflation: 4,
+    costBasis: 20000,
+    taxRate: 15,
+    feeRate: 0.5,
+    horizonYears: 100,
+  };
+  const r = project(base);
+  assert.ok(r.sustainableMonthly > 0);
+  assert.ok(isFinite(r.requiredBtc));
+  relNear(r.requiredBtc * r.sustainableMonthly, base.btc * r.netMonthly, 1e-10);
+
+  const funded = project({...base, spendAmount: r.sustainableMonthly});
+  relNear(funded.requiredBtc, base.btc, 1e-9);
+  assert.equal(funded.survivesHorizon, true);
+  assert.equal(funded.perpetual, true);
+
+  const over = project({...base, spendAmount: r.sustainableMonthly * 1.05});
+  assert.equal(over.survivesHorizon, false);
+  assert.equal(over.perpetual, false);
+});
+
+test('sustainable spend agrees with the simulation when tax is zero', () => {
   const base = {
     btc: 3,
     price: 80000,
@@ -92,13 +393,46 @@ test('closed-form sustainable spend agrees with the simulation', () => {
   };
   const {sustainableMonthly} = project(base);
 
-  // Spending exactly the sustainable amount survives 100 years...
   const at = project({...base, spendAmount: sustainableMonthly});
   assert.equal(at.survivesHorizon, true);
 
-  // ...and 5% more does not.
   const over = project({...base, spendAmount: sustainableMonthly * 1.05});
   assert.equal(over.survivesHorizon, false);
+});
+
+test('100% selling fees with positive spending cannot fund forever', () => {
+  const r = project({
+    btc: 10,
+    price: 100000,
+    spendAmount: 1000,
+    spendPeriod: 'month',
+    cagr: 20,
+    inflation: 3,
+    feeRate: 100,
+    horizonYears: 50,
+  });
+  assert.equal(r.requiredBtc, Infinity);
+  assert.equal(r.perpetual, false);
+  assert.ok(r.series.every(p => p.btc >= 0 && isFinite(p.btc) && isFinite(p.value)));
+});
+
+test('tax and fees that leave no net proceeds cannot fund forever', () => {
+  // 10% fees + 100% tax on a zero basis: net = 0.9p − p < 0.
+  const r = project({
+    btc: 10,
+    price: 100000,
+    spendAmount: 1000,
+    spendPeriod: 'month',
+    cagr: 20,
+    inflation: 3,
+    costBasis: 0,
+    taxRate: 100,
+    feeRate: 10,
+    horizonYears: 50,
+  });
+  assert.equal(r.requiredBtc, Infinity);
+  assert.equal(r.perpetual, false);
+  assert.ok(r.series.every(p => p.btc >= 0 && isFinite(p.btc) && isFinite(p.value)));
 });
 
 test('inflation outrunning growth means nothing is sustainable', () => {
@@ -109,29 +443,14 @@ test('inflation outrunning growth means nothing is sustainable', () => {
     spendPeriod: 'month',
     cagr: 2,
     inflation: 5,
+    costBasis: 10000,
+    taxRate: 20,
+    feeRate: 1,
   });
   assert.equal(r.perpetual, false);
   assert.equal(r.sustainableMonthly, 0);
   assert.equal(r.requiredBtc, Infinity);
-  // A big stack still lasts a long time, it just does not last forever.
   assert.ok(r.depletionMonth === null || r.depletionMonth > 12 * 50);
-});
-
-test('the tax haircut shortens the runway', () => {
-  const base = {
-    btc: 1,
-    price: 100000,
-    spendAmount: 2000,
-    spendPeriod: 'month',
-    cagr: 10,
-    inflation: 3,
-  };
-  const clean = project(base);
-  const taxed = project({...base, taxRate: 30});
-  assert.ok(taxed.depletionMonth < clean.depletionMonth);
-  // Spending is net of tax, so the fiat you actually get is unchanged per month.
-  near(taxed.netMonthly, 2000);
-  near(taxed.grossMonthly, 2000 / 0.7, 1e-9);
 });
 
 test('a negative CAGR still terminates', () => {
@@ -142,6 +461,9 @@ test('a negative CAGR still terminates', () => {
     spendPeriod: 'month',
     cagr: -40,
     inflation: 3,
+    costBasis: 20000,
+    taxRate: 25,
+    feeRate: 1,
     horizonYears: 50,
   });
   assert.ok(r.depletionMonth !== null);
@@ -150,7 +472,7 @@ test('a negative CAGR still terminates', () => {
 });
 
 test('spend period choice does not change the answer', () => {
-  const common = {btc: 2, price: 90000, cagr: 15, inflation: 3};
+  const common = {btc: 2, price: 90000, cagr: 15, inflation: 3, costBasis: 30000, taxRate: 10, feeRate: 0.25};
   const monthly = project({...common, spendAmount: 1200, spendPeriod: 'month'});
   const yearly = project({...common, spendAmount: 14400, spendPeriod: 'year'});
   near(monthly.depletionMonth, yearly.depletionMonth, 1e-9);
@@ -169,6 +491,7 @@ test('zero spend never depletes', () => {
   assert.equal(r.survivesHorizon, true);
   near(r.endBtc, 1);
   near(r.endValue, 100000 * Math.pow(1.1, 30), 1);
+  near(r.requiredBtc, 0, 1e-12);
 });
 
 test('series is monotonically non-increasing in btc and starts at the stack', () => {
@@ -179,6 +502,9 @@ test('series is monotonically non-increasing in btc and starts at the stack', ()
     spendPeriod: 'week',
     cagr: 18,
     inflation: 3,
+    costBasis: 15000,
+    taxRate: 20,
+    feeRate: 0.5,
     horizonYears: 40,
   });
   near(r.series[0].btc, 2.5);
