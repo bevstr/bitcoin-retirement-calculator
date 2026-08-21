@@ -31,10 +31,10 @@
     <fieldset>
       <legend>The stack</legend>
       <div class="grid">
-        <label>Bitcoin held
+        <label><span class="label-text">Bitcoin held <button type="button" class="info" aria-label="About bitcoin held" data-tip="How much BTC you currently own.">i</button></span>
           <input id="btc" type="number" min="0" step="any" value="1" inputmode="decimal" />
         </label>
-        <label>Currency
+        <label><span class="label-text">Currency <button type="button" class="info" aria-label="About currency" data-tip="Fiat currency for price, spend, and value figures.">i</button></span>
           <select id="currency">
             <option value="USD" selected>USD $</option>
             <option value="EUR">EUR €</option>
@@ -45,7 +45,7 @@
             <option value="JPY">JPY ¥</option>
           </select>
         </label>
-        <label class="span2">Price today
+        <label class="span2"><span class="label-text">Price today <button type="button" class="info" aria-label="About price today" data-tip="Fiat price per bitcoin used as the starting point of the projection.">i</button></span>
           <span class="with-btn">
             <input id="price" type="number" min="0" step="any" value="100000" inputmode="decimal" />
             <button id="fetch-price" class="ghost small" type="button">Use live price</button>
@@ -58,10 +58,10 @@
     <fieldset>
       <legend>The spending</legend>
       <div class="grid">
-        <label>Spend
+        <label><span class="label-text">Spend <button type="button" class="info" aria-label="About spend" data-tip="Withdrawal in today's money. Inflation raises it over time so purchasing power stays constant.">i</button></span>
           <input id="spend" type="number" min="0" step="any" value="5000" inputmode="decimal" />
         </label>
-        <label>Per
+        <label><span class="label-text">Per <button type="button" class="info" aria-label="About spend period" data-tip="How often you take that withdrawal (day, week, month, or year).">i</button></span>
           <select id="period">
             <option value="day">day</option>
             <option value="week">week</option>
@@ -76,16 +76,16 @@
     <fieldset>
       <legend>The assumptions</legend>
       <div class="grid">
-        <label>Bitcoin CAGR
+        <label><span class="label-text">Bitcoin CAGR <button type="button" class="info" aria-label="About bitcoin CAGR" data-tip="Assumed annual growth of BTC's fiat price. Compounds monthly. Try a pessimistic number.">i</button></span>
           <span class="suffixed"><input id="cagr" type="number" step="any" value="20" inputmode="decimal" /><span>%/yr</span></span>
         </label>
-        <label>Inflation
+        <label><span class="label-text">Inflation <button type="button" class="info" aria-label="About inflation" data-tip="Assumed yearly rise in living costs. Withdrawals grow with it so you keep the same buying power — not a flat nominal amount.">i</button></span>
           <span class="suffixed"><input id="inflation" type="number" step="any" value="3" inputmode="decimal" /><span>%/yr</span></span>
         </label>
-        <label>Tax + fees on sales
+        <label><span class="label-text">Tax + fees on sales <button type="button" class="info" aria-label="About tax and fees" data-tip="Combined cut on every BTC sale. Spend is what you keep after — sales are grossed up to cover this.">i</button></span>
           <span class="suffixed"><input id="tax" type="number" min="0" max="95" step="any" value="0" inputmode="decimal" /><span>%</span></span>
         </label>
-        <label>Project for
+        <label><span class="label-text">Project for <button type="button" class="info" aria-label="About projection horizon" data-tip="How many years to simulate for the runway, charts, and totals.">i</button></span>
           <span class="suffixed"><input id="horizon" type="number" min="1" max="100" step="1" value="50" inputmode="numeric" /><span>years</span></span>
         </label>
       </div>
@@ -95,22 +95,22 @@
   <!-- ── secondary numbers ─────────────────────────────────────────────── -->
   <section class="tiles">
     <div class="tile">
-      <span class="tile-label">Spend forever, at most</span>
+      <span class="tile-label">Spend forever, at most <button type="button" class="info" aria-label="About spend forever" data-tip="Highest perpetual withdrawal rate this stack can fund if CAGR keeps beating inflation.">i</button></span>
       <strong class="tile-value" id="t-sustainable">—</strong>
       <span class="tile-note" id="t-sustainable-note"></span>
     </div>
     <div class="tile">
-      <span class="tile-label">Stack needed to never run out</span>
+      <span class="tile-label">Stack needed to never run out <button type="button" class="info" aria-label="About stack needed" data-tip="BTC required so your current spend never depletes the stack under these assumptions.">i</button></span>
       <strong class="tile-value" id="t-required">—</strong>
       <span class="tile-note" id="t-required-note"></span>
     </div>
     <div class="tile">
-      <span class="tile-label">Total spent over the run</span>
+      <span class="tile-label">Total spent over the run <button type="button" class="info" aria-label="About total spent" data-tip="Sum of withdrawals (in today's money) until the stack runs out or the horizon ends.">i</button></span>
       <strong class="tile-value" id="t-spent">—</strong>
       <span class="tile-note" id="t-spent-note"></span>
     </div>
     <div class="tile">
-      <span class="tile-label">Left at the end</span>
+      <span class="tile-label">Left at the end <button type="button" class="info" aria-label="About bitcoin left" data-tip="BTC still held when the projection stops — zero if you ran out earlier.">i</button></span>
       <strong class="tile-value" id="t-left">—</strong>
       <span class="tile-note" id="t-left-note"></span>
     </div>

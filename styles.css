@@ -156,6 +156,70 @@ label {
   color: var(--text-secondary);
 }
 
+.label-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Circled ⓘ — short explanation on hover / focus / tap */
+.info {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  margin: 0;
+  border: 1px solid var(--text-muted);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font: 600 10px/1 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  letter-spacing: 0;
+  cursor: help;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+.info:hover,
+.info:focus-visible,
+.info.is-open {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+.info::after {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(260px, 70vw);
+  padding: 8px 10px;
+  border: 1px solid var(--axis);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--text-primary);
+  font: 400 12px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.12s ease, visibility 0.12s ease;
+  z-index: 20;
+}
+.info:hover::after,
+.info:focus-visible::after,
+.info.is-open::after {
+  opacity: 1;
+  visibility: visible;
+}
+
 input, select {
   width: 100%;
   margin-top: 5px;
@@ -227,7 +291,10 @@ button {
   padding: 14px 16px;
 }
 .tile-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 600;

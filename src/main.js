@@ -306,6 +306,28 @@ async function fetchFromCoinbase(code) {
   return Number(data?.data?.amount);
 }
 
+// ── info tooltips (hover + tap) ───────────────────────────────────────────
+function initInfoTips() {
+  const tips = [...document.querySelectorAll('.info')];
+  const closeAll = except => {
+    for (const tip of tips) {
+      if (tip !== except) tip.classList.remove('is-open');
+    }
+  };
+  for (const tip of tips) {
+    tip.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      const open = tip.classList.toggle('is-open');
+      if (open) closeAll(tip);
+    });
+  }
+  document.addEventListener('click', () => closeAll());
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeAll();
+  });
+}
+
 // ── theme ─────────────────────────────────────────────────────────────────
 function initTheme() {
   const saved = localStorage.getItem('brc.theme');
@@ -324,6 +346,7 @@ function initTheme() {
 function boot() {
   applyState(stateFromURL());
   initTheme();
+  initInfoTips();
 
   $('form').addEventListener('input', render);
   $('form').addEventListener('change', render);

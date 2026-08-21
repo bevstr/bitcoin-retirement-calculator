@@ -88,6 +88,16 @@ assert('handles empty input', $('hero-figure').textContent === '—');
 assert('flags the empty field', $('btc').classList.contains('invalid'));
 assert('still no uncaught errors', errors.length === 0, errors.join(' | '));
 
+// Info tooltips on the fields Bevstr asked for.
+const tips = [...document.querySelectorAll('button.info[data-tip]')];
+assert('info tips present', tips.length >= 8, `count=${tips.length}`);
+assert('inflation tip explains purchasing power',
+  (document.querySelector('#inflation')?.closest('label')?.querySelector('.info')?.dataset.tip || '')
+    .toLowerCase().includes('buying power'));
+const inflationTip = document.querySelector('#inflation')?.closest('label')?.querySelector('.info');
+inflationTip?.dispatchEvent(new window.Event('click', {bubbles: true}));
+assert('tip toggles open on click', inflationTip?.classList.contains('is-open'));
+
 let failed = 0;
 for (const [name, ok, detail] of checks) {
   console.log(`${ok ? 'ok  ' : 'FAIL'}  ${name}${ok || !detail ? '' : `  — ${detail}`}`);
