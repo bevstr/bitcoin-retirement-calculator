@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bitcoin Retirement Calculator</title>
+<meta name="description" content="Work out how long a bitcoin stack lasts at a given spend rate, with a projected CAGR, inflation and tax." />
+<link rel="stylesheet" href="./styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>₿</text></svg>" />
+</head>
+<body class="viz-root">
+<main class="wrap">
+
+  <header class="hd">
+    <div>
+      <h1>Bitcoin Retirement Calculator</h1>
+      <p class="sub">How long does the stack last if you spend it down?</p>
+    </div>
+    <button id="theme" class="icon-btn" type="button" aria-label="Switch theme">◐</button>
+  </header>
+
+  <!-- ── the answer ────────────────────────────────────────────────────── -->
+  <section class="card hero" aria-live="polite">
+    <p class="hero-label" id="hero-label">Your stack lasts</p>
+    <p class="hero-figure" id="hero-figure">—</p>
+    <p class="hero-note" id="hero-note"></p>
+  </section>
+
+  <!-- ── inputs ────────────────────────────────────────────────────────── -->
+  <form class="card" id="form" autocomplete="off">
+    <fieldset>
+      <legend>The stack</legend>
+      <div class="grid">
+        <label>Bitcoin held
+          <input id="btc" type="number" min="0" step="any" value="1" inputmode="decimal" />
+        </label>
+        <label>Currency
+          <select id="currency">
+            <option value="USD" selected>USD $</option>
+            <option value="EUR">EUR €</option>
+            <option value="GBP">GBP £</option>
+            <option value="CAD">CAD $</option>
+            <option value="AUD">AUD $</option>
+            <option value="CHF">CHF</option>
+            <option value="JPY">JPY ¥</option>
+          </select>
+        </label>
+        <label class="span2">Price today
+          <span class="with-btn">
+            <input id="price" type="number" min="0" step="any" value="100000" inputmode="decimal" />
+            <button id="fetch-price" class="ghost small" type="button">Use live price</button>
+          </span>
+          <small class="hint" id="price-note">Enter a price, or pull the current one.</small>
+        </label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>The spending</legend>
+      <div class="grid">
+        <label>Spend
+          <input id="spend" type="number" min="0" step="any" value="5000" inputmode="decimal" />
+        </label>
+        <label>Per
+          <select id="period">
+            <option value="day">day</option>
+            <option value="week">week</option>
+            <option value="month" selected>month</option>
+            <option value="year">year</option>
+          </select>
+        </label>
+      </div>
+      <small class="hint">In today's money — inflation is applied on top, so this keeps its purchasing power.</small>
+    </fieldset>
+
+    <fieldset>
+      <legend>The assumptions</legend>
+      <div class="grid">
+        <label>Bitcoin CAGR
+          <span class="suffixed"><input id="cagr" type="number" step="any" value="20" inputmode="decimal" /><span>%/yr</span></span>
+        </label>
+        <label>Inflation
+          <span class="suffixed"><input id="inflation" type="number" step="any" value="3" inputmode="decimal" /><span>%/yr</span></span>
+        </label>
+        <label>Tax + fees on sales
+          <span class="suffixed"><input id="tax" type="number" min="0" max="95" step="any" value="0" inputmode="decimal" /><span>%</span></span>
+        </label>
+        <label>Project for
+          <span class="suffixed"><input id="horizon" type="number" min="1" max="100" step="1" value="50" inputmode="numeric" /><span>years</span></span>
+        </label>
+      </div>
+    </fieldset>
+  </form>
+
+  <!-- ── secondary numbers ─────────────────────────────────────────────── -->
+  <section class="tiles">
+    <div class="tile">
+      <span class="tile-label">Spend forever, at most</span>
+      <strong class="tile-value" id="t-sustainable">—</strong>
+      <span class="tile-note" id="t-sustainable-note"></span>
+    </div>
+    <div class="tile">
+      <span class="tile-label">Stack needed to never run out</span>
+      <strong class="tile-value" id="t-required">—</strong>
+      <span class="tile-note" id="t-required-note"></span>
+    </div>
+    <div class="tile">
+      <span class="tile-label">Total spent over the run</span>
+      <strong class="tile-value" id="t-spent">—</strong>
+      <span class="tile-note" id="t-spent-note"></span>
+    </div>
+    <div class="tile">
+      <span class="tile-label">Left at the end</span>
+      <strong class="tile-value" id="t-left">—</strong>
+      <span class="tile-note" id="t-left-note"></span>
+    </div>
+  </section>
+
+  <!-- ── charts ────────────────────────────────────────────────────────── -->
+  <section class="card">
+    <div class="chart-head">
+      <h2>Bitcoin remaining</h2>
+      <button id="toggle-table" class="ghost small" type="button" aria-expanded="false">Table view</button>
+    </div>
+    <div id="chart-btc"></div>
+  </section>
+
+  <section class="card">
+    <h2>Stack value, at the projected price</h2>
+    <div id="chart-value"></div>
+  </section>
+
+  <section class="card hidden" id="table-card">
+    <h2>Year by year</h2>
+    <div class="table-scroll">
+      <table id="table">
+        <thead>
+          <tr>
+            <th scope="col">Year</th>
+            <th scope="col">Bitcoin left</th>
+            <th scope="col">Price</th>
+            <th scope="col">Stack value</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer class="ft">
+    <div class="row">
+      <button id="share" class="ghost small" type="button">Copy shareable link</button>
+      <button id="reset" class="ghost small" type="button">Reset</button>
+    </div>
+    <p><strong>This is arithmetic, not advice.</strong> It compounds the numbers you type at a constant rate. Bitcoin does not move at a constant rate, and a projection that assumes it does will be wrong about the path even when it is right about the average. Treat a long-dated CAGR as a scenario, not a forecast — and try a pessimistic one.</p>
+    <p>Runs entirely in your browser. Nothing is uploaded; inputs live in the URL so a link reproduces a scenario.</p>
+  </footer>
+
+</main>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

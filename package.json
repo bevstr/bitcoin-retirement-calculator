@@ -1,0 +1,16 @@
+{
+  "name": "bitcoin-retirement-calculator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "How long does a bitcoin stack last if you spend it down? Projects CAGR, inflation and tax.",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/model.test.mjs && node build.mjs && node test/smoke.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "jsdom": "^30.0.1"
+  }
+}
