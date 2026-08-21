@@ -15,7 +15,7 @@ withdrawal keeps its **purchasing power** rather than its nominal size.
 | Input | Meaning |
 | --- | --- |
 | Bitcoin held | The stack today |
-| Price today | Typed in, or pulled live from mempool.space (Coinbase as fallback) |
+| Price today | Typed in, or pulled live from Coinbase (CoinGecko as fallback) |
 | Spend | Per day, week, month or year, in today's money |
 | Bitcoin CAGR | Projected annual growth — negative is allowed, and worth trying |
 | Inflation | Annual increase applied to spending |

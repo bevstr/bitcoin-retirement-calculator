@@ -99,6 +99,44 @@ assert('recomputes on input', $('hero-figure').textContent !== before,
 assert('low spend is perpetual', $('hero-figure').textContent === 'Indefinitely',
   $('hero-figure').textContent);
 
+// Live price: Coinbase first, mocked — no real network.
+const fetchCalls = [];
+window.fetch = async (url) => {
+  fetchCalls.push(String(url));
+  if (String(url).includes('api.coinbase.com/v2/prices/BTC-USD/spot')) {
+    return {ok: true, status: 200, json: async () => ({data: {amount: '99999.6'}})};
+  }
+  throw new Error(`unexpected fetch ${url}`);
+};
+const leftBefore = $('t-left-note').textContent;
+$('fetch-price').click();
+await new Promise((resolve, reject) => {
+  const start = Date.now();
+  const id = setInterval(() => {
+    const text = $('price-note').textContent;
+    if (text.startsWith('Live price:')) {
+      clearInterval(id);
+      resolve();
+    } else if ($('price-note').classList.contains('bad')) {
+      clearInterval(id);
+      reject(new Error(text));
+    } else if (Date.now() - start > 2000) {
+      clearInterval(id);
+      reject(new Error(`timeout: ${text}`));
+    }
+  }, 10);
+});
+assert('live price updates the price field', $('price').value === '100000', $('price').value);
+assert('live price note includes seconds',
+  /\d{1,2}:\d{2}:\d{2}/.test($('price-note').textContent),
+  $('price-note').textContent);
+assert('live price rerenders', $('t-left-note').textContent !== leftBefore,
+  `${leftBefore} -> ${$('t-left-note').textContent}`);
+assert('live price used Coinbase only',
+  fetchCalls.length === 1 && fetchCalls[0].includes('coinbase') &&
+    !fetchCalls.some(u => u.includes('coingecko') || u.includes('mempool')),
+  fetchCalls.join(' | '));
+
 // A blank required field must not throw, and must say so.
 $('btc').value = '';
 $('btc').dispatchEvent(new window.Event('input', {bubbles: true}));

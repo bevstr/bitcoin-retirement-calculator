@@ -1,5 +1,6 @@
 import {project, formatDuration, addMonths, PERIODS_PER_YEAR} from './model.js';
 import {createChart} from './chart.js';
+import {fetchLivePrice, livePriceNote} from './price.js';
 
 const $ = id => document.getElementById(id);
 
@@ -290,10 +291,9 @@ async function fetchPrice() {
   note.textContent = 'Fetching…';
 
   try {
-    const price = await fetchFromMempool(code).catch(() => fetchFromCoinbase(code));
-    if (!price) throw new Error('no price returned');
+    const price = await fetchLivePrice(code);
     $('price').value = Math.round(price);
-    note.textContent = `Live price: ${money(price)} per BTC, just now.`;
+    note.textContent = livePriceNote(money(price));
     render();
   } catch (err) {
     note.classList.add('bad');
@@ -301,21 +301,6 @@ async function fetchPrice() {
   } finally {
     button.disabled = false;
   }
-}
-
-async function fetchFromMempool(code) {
-  const res = await fetch('https://mempool.space/api/v1/prices');
-  if (!res.ok) throw new Error(`mempool ${res.status}`);
-  const data = await res.json();
-  if (!data[code]) throw new Error(`${code} unavailable`);
-  return Number(data[code]);
-}
-
-async function fetchFromCoinbase(code) {
-  const res = await fetch(`https://api.coinbase.com/v2/prices/BTC-${code}/spot`);
-  if (!res.ok) throw new Error(`coinbase ${res.status}`);
-  const data = await res.json();
-  return Number(data?.data?.amount);
 }
 
 // ── info tooltips (hover, focus, tap) ────────────────────────────────────
