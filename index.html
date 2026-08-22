@@ -32,7 +32,7 @@
       <legend>The stack</legend>
       <div class="grid">
         <label><span class="label-text">Bitcoin held <button type="button" class="info" aria-label="About bitcoin held" data-tip="How much BTC you currently own.">i</button></span>
-          <input id="btc" type="number" min="0" step="any" value="1" inputmode="decimal" />
+          <input id="btc" type="number" min="0" step="any" value="6.25" inputmode="decimal" />
         </label>
         <label><span class="label-text">Currency <button type="button" class="info" aria-label="About currency" data-tip="Fiat currency for price, spend, cost basis, and value figures.">i</button></span>
           <select id="currency">
@@ -59,7 +59,7 @@
       <legend>The spending</legend>
       <div class="grid">
         <label><span class="label-text">Spend <button type="button" class="info" aria-label="About spend" data-tip="Withdrawal in today's money. Inflation raises it over time so purchasing power stays constant.">i</button></span>
-          <input id="spend" type="number" min="0" step="any" value="5000" inputmode="decimal" />
+          <input id="spend" type="number" min="0" step="any" value="6000" inputmode="decimal" />
         </label>
         <label><span class="label-text">Per <button type="button" class="info" aria-label="About spend period" data-tip="How often you take that withdrawal (day, week, month, or year).">i</button></span>
           <select id="period">
@@ -77,25 +77,29 @@
       <legend>The assumptions</legend>
       <div class="grid">
         <label><span class="label-text">Bitcoin CAGR <button type="button" class="info" aria-label="About bitcoin CAGR" data-tip="Assumed annual growth of BTC's fiat price. Compounds monthly. Try a pessimistic number.">i</button></span>
-          <span class="suffixed"><input id="cagr" type="number" step="any" value="20" inputmode="decimal" /><span>%/yr</span></span>
+          <span class="suffixed"><input id="cagr" type="number" step="any" value="25" inputmode="decimal" /><span>%/yr</span></span>
         </label>
         <label><span class="label-text">Inflation <button type="button" class="info" aria-label="About inflation" data-tip="Assumed yearly rise in living costs. Withdrawals grow with it so you keep the same buying power — not a flat nominal amount.">i</button></span>
           <span class="suffixed"><input id="inflation" type="number" step="any" value="3" inputmode="decimal" /><span>%/yr</span></span>
         </label>
         <label><span class="label-text">Estimated average BTC cost basis <button type="button" class="info" aria-label="About estimated average BTC cost basis" data-tip="Your approximate average purchase price per BTC. Used to estimate gains on future sales. Actual tax depends on your acquisition lots and jurisdiction.">i</button></span>
-          <input id="basis" type="number" min="0" step="any" value="0" inputmode="decimal" />
+          <input id="basis" type="number" min="0" step="any" value="30000" inputmode="decimal" />
         </label>
         <label><span class="label-text">Estimated tax rate on gains <button type="button" class="info" aria-label="About estimated tax rate on gains" data-tip="Estimated tax rate applied only to gains above your entered cost basis. Discounts, losses and other tax concessions are not modelled.">i</button></span>
-          <span class="suffixed"><input id="tax" type="number" min="0" max="100" step="any" value="0" inputmode="decimal" /><span>%</span></span>
+          <span class="suffixed"><input id="tax" type="number" min="0" max="100" step="any" value="25" inputmode="decimal" /><span>%</span></span>
         </label>
         <label><span class="label-text">Selling fees <button type="button" class="info" aria-label="About selling fees" data-tip="Estimated selling or exchange fees applied to the full value of each BTC sale.">i</button></span>
-          <span class="suffixed"><input id="fees" type="number" min="0" max="100" step="any" value="0" inputmode="decimal" /><span>%</span></span>
+          <span class="suffixed"><input id="fees" type="number" min="0" max="100" step="any" value="0.5" inputmode="decimal" /><span>%</span></span>
         </label>
         <label><span class="label-text">Project for <button type="button" class="info" aria-label="About projection horizon" data-tip="How many years to simulate for the runway, charts, and totals.">i</button></span>
-          <span class="suffixed"><input id="horizon" type="number" min="1" max="100" step="1" value="50" inputmode="numeric" /><span>years</span></span>
+          <span class="suffixed"><input id="horizon" type="number" min="1" max="100" step="1" value="30" inputmode="numeric" /><span>years</span></span>
         </label>
       </div>
     </fieldset>
+    <div class="row form-actions">
+      <button id="share" class="ghost small" type="button">Copy shareable link</button>
+      <button id="reset" class="ghost small" type="button">Reset</button>
+    </div>
   </form>
 
   <!-- ── secondary numbers ─────────────────────────────────────────────── -->
@@ -154,12 +158,8 @@
   </section>
 
   <footer class="ft">
-    <div class="row">
-      <button id="share" class="ghost small" type="button">Copy shareable link</button>
-      <button id="reset" class="ghost small" type="button">Reset</button>
-    </div>
     <p><strong>This is arithmetic, not advice.</strong> It compounds the numbers you type at a constant rate. Bitcoin does not move at a constant rate, and a projection that assumes it does will be wrong about the path even when it is right about the average. Treat a long-dated CAGR as a scenario, not a forecast — and try a pessimistic one.</p>
-    <p>Runs entirely in your browser. Nothing is uploaded; inputs live in the URL so a link reproduces a scenario.</p>
+    <p>Runs entirely in your browser. Nothing is uploaded. Use “Copy shareable link” to reproduce a scenario.</p>
   </footer>
 
 </main>

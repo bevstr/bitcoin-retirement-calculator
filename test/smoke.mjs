@@ -188,6 +188,86 @@ const described = tips.every(b => {
 assert('tips are exposed to assistive tech', described);
 assert('tips render outside the cards', document.querySelectorAll('body > .tip').length === tips.length);
 
+const formHtml = $('form').outerHTML;
+assert('share lives in the form', formHtml.includes('id="share"'));
+assert('reset lives in the form', formHtml.includes('id="reset"'));
+assert('share exists once', document.querySelectorAll('#share').length === 1);
+assert('reset exists once', document.querySelectorAll('#reset').length === 1);
+
+window.navigator.clipboard = {writeText: async href => { window.__copied = href; }};
+$('share').click();
+await new Promise(r => setTimeout(r, 0));
+assert('copied share link is compact p=1',
+  typeof window.__copied === 'string' &&
+    window.__copied.includes('?p=1') &&
+    !window.__copied.includes('price='),
+  String(window.__copied));
+
+const resetFetchesBefore = fetchCalls.length;
+$('reset').click();
+await new Promise((resolve, reject) => {
+  const start = Date.now();
+  const id = setInterval(() => {
+    const text = $('price-note').textContent;
+    if (text.startsWith('Live price:')) {
+      clearInterval(id);
+      resolve();
+    } else if (Date.now() - start > 2000) {
+      clearInterval(id);
+      reject(new Error(`reset timeout: ${text}`));
+    }
+  }, 10);
+});
+assert('reset restores current btc default', $('btc').value === '6.25', $('btc').value);
+assert('reset restores current spend default', $('spend').value === '6000', $('spend').value);
+assert('reset restores current cagr default', $('cagr').value === '25', $('cagr').value);
+assert('reset restores current tax default', $('tax').value === '25', $('tax').value);
+assert('reset restores current basis default', $('basis').value === '30000', $('basis').value);
+assert('reset restores current fees default', $('fees').value === '0.5', $('fees').value);
+assert('reset restores current horizon default', $('horizon').value === '30', $('horizon').value);
+assert('reset triggers one live-price fetch',
+  fetchCalls.length - resetFetchesBefore === 1,
+  `${resetFetchesBefore} -> ${fetchCalls.length}: ${fetchCalls.slice(resetFetchesBefore).join(' | ')}`);
+assert('reset session is cleared', window.sessionStorage.getItem('brc.session') === null);
+
+// Fresh visit with no price must auto-fetch once (mocked, no real network).
+{
+  const autoCalls = [];
+  const autoDom = new JSDOM(readFileSync('dist/index.html', 'utf8'), {
+    runScripts: 'outside-only',
+    url: 'https://example.com/bitcoin-retirement-calculator',
+    pretendToBeVisual: true,
+    virtualConsole,
+  });
+  autoDom.window.ResizeObserver ??= class { observe() {} disconnect() {} };
+  autoDom.window.fetch = async (url) => {
+    autoCalls.push(String(url));
+    if (String(url).includes('api.coinbase.com/v2/prices/BTC-USD/spot')) {
+      return {ok: true, status: 200, json: async () => ({data: {amount: '123456.7'}})};
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+  autoDom.window.eval(readFileSync('dist/app.js', 'utf8').replace(/export\s*\{[^}]*\};?/g, ''));
+  await new Promise((resolve, reject) => {
+    const start = Date.now();
+    const id = setInterval(() => {
+      const text = autoDom.window.document.getElementById('price-note').textContent;
+      if (text.startsWith('Live price:')) {
+        clearInterval(id);
+        resolve();
+      } else if (Date.now() - start > 2000) {
+        clearInterval(id);
+        reject(new Error(`auto-fetch timeout: ${text}`));
+      }
+    }, 10);
+  });
+  assert('fresh load auto-fetches live price once', autoCalls.length === 1, autoCalls.join(' | '));
+  assert('fresh load used Coinbase', autoCalls[0].includes('coinbase'));
+  assert('fresh load price field updated',
+    autoDom.window.document.getElementById('price').value === '123457',
+    autoDom.window.document.getElementById('price').value);
+}
+
 // jsdom applies no CSS, so structural assertions alone once let an entirely
 // unstyled tooltip ship. Check the built stylesheet actually styles every
 // class the scripts create at runtime.
@@ -198,6 +278,9 @@ for (const cls of ['tip', 'chart-tip', 'chart-grid', 'chart-axis', 'chart-tick',
     new RegExp(`\\.${cls}\\b[^{]*\\{`).test(css));
 }
 assert('.tip is positioned', /\.tip\s*\{[^}]*position:\s*fixed/.test(css));
+assert('form-actions are styled', /\.form-actions\s*\{/.test(css));
+assert('form-actions stack on mobile',
+  /@media \(max-width: 480px\)[\s\S]*form-actions/.test(css));
 assert('no dead ::after tooltip rules', !/\.info[^{]*::after/.test(css));
 
 let failed = 0;

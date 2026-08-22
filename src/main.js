@@ -1,20 +1,22 @@
-import {project, formatDuration, addMonths, PERIODS_PER_YEAR} from './model.js';
+import {project, formatDuration, addMonths} from './model.js';
 import {createChart} from './chart.js';
 import {fetchLivePrice, livePriceNote} from './price.js';
+import {compactShareURL} from './share.js';
+import {clearSession, readSession, resolveInitialState, writeSession} from './session.js';
 
 const $ = id => document.getElementById(id);
 
 const FIELDS = {
-  btc: 1,
+  btc: 6.25,
   price: 100000,
-  spend: 5000,
+  spend: 6000,
   period: 'month',
-  cagr: 20,
+  cagr: 25,
   inflation: 3,
-  tax: 0,
-  basis: 0,
-  fees: 0,
-  horizon: 50,
+  tax: 25,
+  basis: 30000,
+  fees: 0.5,
+  horizon: 30,
   currency: 'USD',
 };
 
@@ -80,16 +82,13 @@ function applyState(state) {
   }
 }
 
-function stateFromURL() {
-  const q = new URLSearchParams(location.search);
-  const state = {};
-  for (const key of Object.keys(FIELDS)) {
-    if (!q.has(key)) continue;
-    const raw = q.get(key);
-    state[key] = key === 'period' || key === 'currency' ? raw : Number(raw);
-  }
-  if (!PERIODS_PER_YEAR[state.period]) delete state.period;
-  return state;
+function persistSession() {
+  writeSession(readInputs(), sessionStorage);
+}
+
+function onFormUpdate() {
+  render();
+  persistSession();
 }
 
 function writeURL(input) {
@@ -414,12 +413,13 @@ function initTheme() {
 
 // ── boot ──────────────────────────────────────────────────────────────────
 function boot() {
-  applyState(stateFromURL());
+  const initial = resolveInitialState(location.search, readSession(sessionStorage));
+  applyState(initial.state);
   initTheme();
   initInfoTips();
 
-  $('form').addEventListener('input', render);
-  $('form').addEventListener('change', render);
+  $('form').addEventListener('input', onFormUpdate);
+  $('form').addEventListener('change', onFormUpdate);
   $('form').addEventListener('submit', e => e.preventDefault());
   $('fetch-price').onclick = fetchPrice;
 
@@ -431,17 +431,22 @@ function boot() {
   };
 
   $('share').onclick = async () => {
-    await navigator.clipboard.writeText(location.href);
+    const href = compactShareURL(readInputs(), location.origin, location.pathname);
+    await navigator.clipboard.writeText(href);
     $('share').textContent = 'Link copied';
     setTimeout(() => ($('share').textContent = 'Copy shareable link'), 1400);
   };
 
   $('reset').onclick = () => {
+    clearSession(sessionStorage);
     applyState({});
     render();
+    fetchPrice();
   };
 
   render();
+  if (initial.source === 'url') persistSession();
+  if (initial.fetchLivePrice) fetchPrice();
 }
 
 boot();

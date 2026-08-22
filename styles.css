@@ -262,6 +262,11 @@ button {
 .small { padding: 7px 12px; font-size: 13px; }
 
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
+form.card > .form-actions {
+  margin-top: 14px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
 
 /* ── stat tiles ─────────────────────────────────────────────────────── */
 .tiles {
@@ -363,4 +368,5 @@ th { color: var(--text-muted); font-weight: 600; }
 @media (max-width: 480px) {
   .grid { grid-template-columns: 1fr; }
   .with-btn { flex-direction: column; }
+  form.card > .form-actions { flex-direction: column; }
 }
